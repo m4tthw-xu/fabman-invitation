@@ -50,16 +50,6 @@ eb create fabman-search-env
 3. Deploy updates:
 eb deploy
 
-## Project Structure
-
-.
-├── application.py      # Main Flask application
-├── static/            # Static files
-│   └── index.html     # Frontend interface
-├── tiw_secrets.py     # AWS Secrets Manager integration
-├── requirements.txt   # Python dependencies
-└── Procfile          # Elastic Beanstalk configuration
-
 ## API Endpoints
 
 ### GET /api/search-members
