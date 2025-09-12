@@ -53,11 +53,49 @@ jobs:
       run: rm deploy.zip
       
     - name: Get environment URL
+      id: get_url
       run: |
-        echo "🚀 Production deployment complete!"
-        aws elasticbeanstalk describe-environments \
+        PROD_URL=$(aws elasticbeanstalk describe-environments \
           --application-name fabman-search-v2 \
           --environment-names fabman-search-v2-env \
           --region us-east-1 \
           --query 'Environments[0].CNAME' \
-          --output text
+          --output text)
+        echo "prod_url=https://$PROD_URL" >> $GITHUB_OUTPUT
+        echo "🚀 Production deployment complete!"
+        echo "URL: https://$PROD_URL"
+        
+    - name: Validate production deployment
+      run: |
+        echo "🔍 Validating production deployment..."
+        PROD_URL="${{ steps.get_url.outputs.prod_url }}"
+        
+        # Wait for deployment to stabilize
+        sleep 30
+        
+        # Test basic connectivity with retries
+        for i in {1..5}; do
+          if curl -f -s --max-time 30 "$PROD_URL" > /dev/null; then
+            echo "✅ Production environment is responding (attempt $i)"
+            break
+          else
+            echo "⏳ Waiting for production environment (attempt $i/5)..."
+            sleep 30
+          fi
+          
+          if [ $i -eq 5 ]; then
+            echo "❌ Production environment validation failed"
+            exit 1
+          fi
+        done
+        
+        # Test that static files are served
+        if curl -f -s --max-time 30 "$PROD_URL/favicon.ico" > /dev/null; then
+          echo "✅ Static files are being served"
+        else
+          echo "⚠️ Static files test failed"
+        fi
+        
+        echo "## 🎉 Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** $PROD_URL" >> $GITHUB_STEP_SUMMARY
+        echo "**Deployment validated:** $(date)" >> $GITHUB_STEP_SUMMARY

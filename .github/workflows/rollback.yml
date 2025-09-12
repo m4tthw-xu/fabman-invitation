@@ -1,0 +1,199 @@
+name: Emergency Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+        - production
+        - development
+        default: 'production'
+      version_label:
+        description: 'Version label to rollback to (leave empty to rollback to previous version)'
+        required: false
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set environment variables
+      run: |
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          echo "ENV_NAME=fabman-search-v2-env" >> $GITHUB_ENV
+        else
+          echo "ENV_NAME=fabman-search-dev-env" >> $GITHUB_ENV
+        fi
+        
+    - name: Get current deployment info
+      id: current_info
+      run: |
+        # Get current version
+        CURRENT_VERSION=$(aws elasticbeanstalk describe-environments \
+          --application-name fabman-search-v2 \
+          --environment-names $ENV_NAME \
+          --region us-east-1 \
+          --query 'Environments[0].VersionLabel' \
+          --output text)
+        
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "📍 Current version: $CURRENT_VERSION"
+        
+    - name: List recent versions
+      run: |
+        echo "📋 Recent application versions:"
+        aws elasticbeanstalk describe-application-versions \
+          --application-name fabman-search-v2 \
+          --region us-east-1 \
+          --max-items 10 \
+          --query 'ApplicationVersions[*].[VersionLabel,DateCreated,Status]' \
+          --output table
+          
+    - name: Determine rollback version
+      id: rollback_version
+      run: |
+        if [ -n "${{ inputs.version_label }}" ]; then
+          # Use specified version
+          ROLLBACK_VERSION="${{ inputs.version_label }}"
+          echo "🎯 Rolling back to specified version: $ROLLBACK_VERSION"
+        else
+          # Get previous version (second most recent)
+          ROLLBACK_VERSION=$(aws elasticbeanstalk describe-application-versions \
+            --application-name fabman-search-v2 \
+            --region us-east-1 \
+            --max-items 2 \
+            --query 'ApplicationVersions[1].VersionLabel' \
+            --output text)
+          echo "⏮️ Rolling back to previous version: $ROLLBACK_VERSION"
+        fi
+        
+        echo "rollback_version=$ROLLBACK_VERSION" >> $GITHUB_OUTPUT
+        
+        # Verify the version exists
+        if [ "$ROLLBACK_VERSION" = "None" ] || [ -z "$ROLLBACK_VERSION" ]; then
+          echo "❌ Could not determine rollback version"
+          exit 1
+        fi
+        
+    - name: Confirm rollback
+      run: |
+        echo "## 🚨 Rollback Confirmation" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY  
+        echo "**Current Version:** ${{ steps.current_info.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Rollback Version:** ${{ steps.rollback_version.outputs.rollback_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Initiated by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Execute rollback
+      run: |
+        echo "🔄 Executing rollback..."
+        aws elasticbeanstalk update-environment \
+          --application-name fabman-search-v2 \
+          --environment-name $ENV_NAME \
+          --version-label "${{ steps.rollback_version.outputs.rollback_version }}" \
+          --region us-east-1
+          
+        echo "⏳ Waiting for rollback to complete..."
+        
+    - name: Wait for rollback completion
+      run: |
+        # Wait for environment to update
+        aws elasticbeanstalk wait environment-updated \
+          --application-name fabman-search-v2 \
+          --environment-names $ENV_NAME \
+          --region us-east-1 \
+          --cli-read-timeout 600 \
+          --cli-connect-timeout 60
+          
+        echo "✅ Rollback deployment completed"
+        
+    - name: Validate rollback
+      run: |
+        # Get environment URL
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          CNAME=$(aws elasticbeanstalk describe-environments \
+            --application-name fabman-search-v2 \
+            --environment-names $ENV_NAME \
+            --region us-east-1 \
+            --query 'Environments[0].CNAME' \
+            --output text)
+          URL="https://$CNAME"
+        else
+          URL="https://fabman-search-dev-env.eba-xb4jdeqp.us-east-1.elasticbeanstalk.com"
+        fi
+        
+        # Wait for rollback to stabilize
+        sleep 30
+        
+        # Test basic connectivity
+        for i in {1..5}; do
+          if curl -f -s --max-time 30 "$URL" > /dev/null; then
+            echo "✅ Environment is responding after rollback (attempt $i)"
+            break
+          else
+            echo "⏳ Waiting for environment to respond (attempt $i/5)..."
+            sleep 30
+          fi
+          
+          if [ $i -eq 5 ]; then
+            echo "❌ Environment validation failed after rollback"
+            exit 1
+          fi
+        done
+        
+        # Get final status
+        FINAL_VERSION=$(aws elasticbeanstalk describe-environments \
+          --application-name fabman-search-v2 \
+          --environment-names $ENV_NAME \
+          --region us-east-1 \
+          --query 'Environments[0].VersionLabel' \
+          --output text)
+          
+        echo "## ✅ Rollback Successful" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Final Version:** $FINAL_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "**URL:** $URL" >> $GITHUB_STEP_SUMMARY
+        echo "**Completed:** $(date)" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Create incident issue
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        title: "🚨 INCIDENT: Rollback executed on ${{ inputs.environment }}"
+        body: |
+          ## 🚨 Emergency Rollback Executed
+          
+          **Environment:** ${{ inputs.environment }}
+          **Reason:** ${{ inputs.reason }}
+          **Initiated by:** @${{ github.actor }}
+          **Date:** $(date)
+          
+          ### Details
+          - **Previous Version:** ${{ steps.current_info.outputs.current_version }}
+          - **Rolled back to:** ${{ steps.rollback_version.outputs.rollback_version }}
+          
+          ### Next Steps
+          - [ ] Investigate root cause of the issue
+          - [ ] Determine if additional fixes are needed
+          - [ ] Plan for re-deployment when ready
+          - [ ] Update team on status
+          
+          **Auto-generated by rollback workflow**
+        branch: incident-rollback-${{ github.run_number }}
+        base: develop
+        labels: |
+          incident
+          rollback
+          urgent
