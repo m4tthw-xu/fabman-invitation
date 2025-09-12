@@ -1,6 +1,7 @@
 """
 Accessing AWS Secretes Manager for pulling API keys for Canvas and Fabman.
 """
+
 # standard library imports
 import base64
 import json
