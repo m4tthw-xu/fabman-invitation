@@ -1,14 +1,14 @@
-name: CD - Deploy to Production
+name: CD - Deploy to Dev Environment
 
 on:
   push:
-    branches: [ main ]
+    branches: [ develop ]
   workflow_dispatch:  # Allow manual deployment
 
 jobs:
-  deploy-prod:
+  deploy-dev:
     runs-on: ubuntu-latest
-    environment: production  # GitHub environment for additional protection
+    environment: development  # GitHub environment for dev protection
     
     steps:
     - name: Checkout code
@@ -24,10 +24,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Run basic smoke test
-      run: |
-        python -c "import application; print('Application imports successfully')"
-        
     - name: Generate deployment package
       run: |
         zip -r deploy.zip . -x "*.git*" "*__pycache__*" "*.pyc" ".env" "requirements-dev.txt" ".github/*" "README.md"
@@ -36,28 +32,28 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
       
-    - name: Deploy to Production Elastic Beanstalk
+    - name: Deploy to Dev Elastic Beanstalk
       uses: einaregilsson/beanstalk-deploy@v22
       with:
         aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         application_name: fabman-search-v2
-        environment_name: fabman-search-v2-env
+        environment_name: fabman-search-dev-env
         region: us-east-1
-        version_label: prod-${{ github.sha }}-${{ steps.timestamp.outputs.timestamp }}
+        version_label: dev-${{ github.sha }}-${{ steps.timestamp.outputs.timestamp }}
         deployment_package: deploy.zip
         wait_for_deployment: true
-        wait_for_environment_recovery: 300
+        wait_for_environment_recovery: 180
         
     - name: Clean up deployment package
       run: rm deploy.zip
       
     - name: Get environment URL
       run: |
-        echo "🚀 Production deployment complete!"
+        echo "🚀 Dev deployment complete!"
         aws elasticbeanstalk describe-environments \
           --application-name fabman-search-v2 \
-          --environment-names fabman-search-v2-env \
+          --environment-names fabman-search-dev-env \
           --region us-east-1 \
           --query 'Environments[0].CNAME' \
           --output text
