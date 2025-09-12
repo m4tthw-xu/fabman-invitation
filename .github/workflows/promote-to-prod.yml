@@ -82,6 +82,13 @@ jobs:
         id: timestamp
         run: echo "date=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
 
+      - name: Merge develop changes
+        if: steps.check_changes.outputs.changes_exist == 'true'
+        run: |
+          # Checkout main and merge develop
+          git checkout main
+          git merge origin/develop --no-edit
+          
       - name: Create Pull Request
         if: steps.check_changes.outputs.changes_exist == 'true'
         uses: peter-evans/create-pull-request@v5
@@ -115,7 +122,6 @@ jobs:
 
           branch: promote-to-prod-${{ github.run_number }}
           base: main
-          head: develop
           draft: false
           labels: |
             deployment
