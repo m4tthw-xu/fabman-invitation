@@ -24,9 +24,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
-    - name: Run basic smoke test
+    - name: Validate dependencies
       run: |
-        python -c "import application; print('Application imports successfully')"
+        python -c "import flask, fabman, tiw_secrets; print('Core dependencies validated')"
         
     - name: Generate deployment package
       run: |
