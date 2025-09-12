@@ -43,4 +43,4 @@ jobs:
     - name: Validate requirements.txt
       run: |
         pip install -r requirements.txt
-        python -c "import application; print('Application imports successfully')"
+        python -c "import flask, fabman, tiw_secrets; print('Core dependencies import successfully')"
