@@ -78,6 +78,9 @@ jobs:
           echo "📋 Changes found between develop and main"
           git log --oneline origin/main..origin/develop
         fi
+    - name: Get current timestamp
+      id: timestamp
+      run: echo "date=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_OUTPUT
         
     - name: Create Pull Request
       if: steps.check_changes.outputs.changes_exist == 'true'
@@ -90,7 +93,7 @@ jobs:
           
           **Reason:** ${{ inputs.reason }}
           **Initiated by:** @${{ github.actor }}
-          **Date:** ${{ env.DATE }}
+          **Date:** ${{ steps.timestamp.outputs.date }}
           
           ### 📋 Deployment Checklist
           - [ ] Dev environment tests passed
@@ -133,6 +136,3 @@ jobs:
         echo "A pull request has been created to promote changes to production." >> $GITHUB_STEP_SUMMARY
         echo "**Reason:** ${{ inputs.reason }}" >> $GITHUB_STEP_SUMMARY
         echo "Please review and merge the PR to deploy to production." >> $GITHUB_STEP_SUMMARY
-        
-    env:
-      DATE: ${{ steps.date.outputs.date }}
