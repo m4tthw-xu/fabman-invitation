@@ -1,0 +1,16 @@
+# Development dependencies
+-r requirements.txt
+
+# Code formatting and linting
+black
+black[jupyter]
+flake8
+isort
+
+# Development tools
+ipykernel
+jupyter
+
+# Testing (when added)
+pytest
+pytest-cov

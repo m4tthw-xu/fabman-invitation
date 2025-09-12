@@ -1,0 +1,53 @@
+name: CD - Deploy to Dev Environment
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: # Allow manual deployment
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    environment: development # GitHub environment for dev protection
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate deployment package
+        run: |
+          zip -r deploy.zip . -x "*.git*" "*__pycache__*" "*.pyc" ".env" "requirements-dev.txt" ".github/*" "README.md"
+
+      - name: Get timestamp for version label
+        id: timestamp
+        run: echo "timestamp=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Dev Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: fabman-search-v2
+          environment_name: fabman-search-dev-env
+          region: us-east-1
+          version_label: dev-${{ github.sha }}-${{ steps.timestamp.outputs.timestamp }}
+          deployment_package: deploy.zip
+          wait_for_deployment: true
+          wait_for_environment_recovery: 180
+
+      - name: Clean up deployment package
+        run: rm deploy.zip
+
+      - name: Completion message
+        run: |
+          echo "Deployment complete to dev environment!"
