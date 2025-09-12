@@ -27,8 +27,15 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 4. Set up environment variables:
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
+cp .env.example .env
+# Edit .env to set FLASK_ENV=development
+
+5. Configure AWS credentials (choose one):
+# Option A: AWS CLI
+aws configure
+
+# Option B: Environment variables
+export AWS_PROFILE=your_profile_name
 
 ## Local Development
 
@@ -39,16 +46,30 @@ The application will be available at http://localhost:5000
 
 ## Deployment
 
+### Automated Deployment (Recommended)
+This repository uses GitHub Actions for CI/CD. See [CICD_SETUP.md](./CICD_SETUP.md) for complete setup instructions.
+
+**Quick Setup**:
+1. Add AWS credentials to GitHub repository secrets
+2. Push to `main` branch for automatic deployment
+
+### Manual Deployment
 The application is configured for AWS Elastic Beanstalk deployment.
 
 1. Initialize Elastic Beanstalk (first time only):
+```bash
 eb init
+```
 
 2. Create an environment (first time only):
+```bash
 eb create fabman-search-env
+```
 
 3. Deploy updates:
+```bash
 eb deploy
+```
 
 ## API Endpoints
 

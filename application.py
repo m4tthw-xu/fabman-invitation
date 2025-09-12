@@ -3,19 +3,30 @@ import tiw_secrets
 import fabman
 from flask_cors import CORS
 import os
-from functools import wraps
 
 app = Flask(__name__, static_folder='static')
 
-# CORS configuration
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:5000", 
-            "http://127.0.0.1:5000",
+# Environment-based CORS configuration
+def get_cors_origins():
+    """Get CORS origins based on environment"""
+    base_origins = [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000"
+    ]
+    
+    # Add production URLs if in production environment
+    if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('AWS_REGION'):
+        production_origins = [
             "http://fabman-search-env.eba-p4jnfsvv.us-east-1.elasticbeanstalk.com",
             "https://fabman-search-env.eba-p4jnfsvv.us-east-1.elasticbeanstalk.com"
-        ],
+        ]
+        base_origins.extend(production_origins)
+    
+    return base_origins
+
+CORS(app, resources={
+    r"/api/*": {
+        "origins": get_cors_origins(),
         "methods": ["GET", "POST"],
         "allow_headers": ["Content-Type"]
     }
@@ -82,13 +93,6 @@ def favicon():
     return send_from_directory(app.static_folder, 'favicon.ico')
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
-
-    
-
-
-
-
-
-
+    # Only enable debug mode in development
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    app.run(debug=debug_mode)
