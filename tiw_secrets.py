@@ -11,8 +11,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 
-class Secrets():
-
+class Secrets:
     def __init__(self) -> None:
         """
         Initialize Secrets class to pull secrets from AWS Secrets Manager.
@@ -23,10 +22,10 @@ class Secrets():
         try:
             # Create the client directly without session
             client = boto3.client(
-                service_name='secretsmanager',
+                service_name="secretsmanager",
                 region_name=region_name,
-                aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+                aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
             )
 
             secrets_response = client.get_secret_value(SecretId=secret_name)
@@ -88,7 +87,7 @@ class Secrets():
         :rtype: str
         """
         return self.__fabman_api_key
-    
+
     @property
     def dev_api_key(self) -> str:
         """
