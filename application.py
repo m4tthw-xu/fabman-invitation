@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify, send_from_directory
-import tiw_secrets
-import fabman
-from flask_cors import CORS
 import os
+
+import fabman
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+
+import tiw_secrets
 
 app = Flask(__name__, static_folder="static")
 
