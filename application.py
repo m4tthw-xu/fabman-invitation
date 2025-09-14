@@ -14,6 +14,14 @@ def get_cors_origins():
     """Get CORS origins based on environment"""
     base_origins = ["http://localhost:5000", "http://127.0.0.1:5000"]
 
+    # Add production URLs if in production environment
+    if os.environ.get("FLASK_ENV") == "production" or os.environ.get("AWS_REGION"):
+        production_origins = [
+            "http://fabman-search-env.eba-p4jnfsvv.us-east-1.elasticbeanstalk.com",
+            "https://fabman-search-env.eba-p4jnfsvv.us-east-1.elasticbeanstalk.com",
+        ]
+        base_origins.extend(production_origins)
+
     return base_origins
 
 
@@ -92,4 +100,6 @@ def favicon():
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    # Only enable debug mode in development
+    debug_mode = os.environ.get("FLASK_ENV") != "production"
+    app.run(debug=debug_mode)
