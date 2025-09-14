@@ -22,7 +22,6 @@ CORS(
     resources={
         r"/api/*": {
             "origins": get_cors_origins(),
-            
             "methods": ["GET", "POST"],
             "allow_headers": ["Content-Type"],
         }
